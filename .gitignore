@@ -1,0 +1,23 @@
+# R files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.png
+
+# Mac files
+.DS_Store
+
+# Python environment
+.venv/
+.env/
+.Rproj.user
