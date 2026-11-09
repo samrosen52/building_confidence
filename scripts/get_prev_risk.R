@@ -1,5 +1,5 @@
 # File from work
-
+library(dplyr)
 
 
 test <- auto_summary(con, demo_path, "cohortgrp_a", force_type = "categorical") |>
@@ -128,8 +128,6 @@ get_p_value <- function(yes, no) {
   fit_null <- glm(cbind(yes, no) ~ 0 + offset(rep(0, lenght(yes))), family = binomial())
   anova(fit_null, model, test = "Chisq")
 }
-
-get_risk_by_group(8, 24500)
 
 
 
