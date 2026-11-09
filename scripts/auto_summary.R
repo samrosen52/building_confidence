@@ -152,7 +152,7 @@ auto_summary <- function(conn, table, vars, by = NULL, dir = "row", variable_spe
   sql <- paste(pieces, collapse = "\nUNION ALL\n")
   # return(sql)
   
-  dbGetQuery(conn, sql)
+  DBI::dbGetQuery(conn, sql)
   # vars_q <- DBI::dbQuoteIdentifier(conn, vars)
   # 
   # casts <- paste0("CAST(")
@@ -161,7 +161,7 @@ auto_summary <- function(conn, table, vars, by = NULL, dir = "row", variable_spe
 
 test_summ <- auto_summary(conn = con, vars = "alzheim_BIN", by = "state", table = "data/sim_data.parquet", variable_specs = variable_specs)
 
-
+auto_summary(con, "data/sim_data.parquet", c("alzheim_BIN", "state"), variable_specs = variable_specs)
 
 add_pct_ci <- function(x, dir = "row", conf = 0.95) {
   is_cat <- x$type == "categorical"
