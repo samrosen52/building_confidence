@@ -163,6 +163,13 @@ test_summ <- auto_summary(conn = con, vars = "alzheim_BIN", by = "state", table 
 
 auto_summary(con, "data/sim_data.parquet", c("alzheim_BIN", "state"), variable_specs = variable_specs)
 
+
+?ave
+(g <- sample(c("u","s","e","R"), 24, replace = TRUE))
+ave(seq_along(g), g, FUN = seq_along)
+
+ave(sum(g), g, FUN = sum)
+
 add_pct_ci <- function(x, dir = "row", conf = 0.95) {
   is_cat <- x$type == "categorical"
   key <- if(all(is.na(x$by_var))) x$var
