@@ -38,8 +38,8 @@ get_variable_names <- function(conn, data_path) {
   sql_call <- sprintf("CREATE VIEW data00data AS SELECT * FROM '%s'", data_path)
   
   DBI::dbExecute(conn, sql_call)
-  var_cols <- DBI::get_query(conn, "PRAGMA table_info('data00data')")
-  # DBI::dbExecute(conn, "DROP VIEW data00data")
+  var_cols <- DBI::dbGetQuery(conn, "PRAGMA table_info('data00data')")
+  DBI::dbExecute(conn, "DROP VIEW data00data")
   
   return(var_cols)
 }
@@ -70,8 +70,8 @@ view_rows <- function(conn, data_path, rows = 10, view = TRUE) {
   # NOTE: SEPARATE THESE FUNCTIONS AND maybe don't create view before
   out <- DBI::dbGetQuery(conn, sprintf("SELECT * FROM 'data00data' FETCH FIRST %s ROWS ONLY", rows))
   
-  DBI::dbExecute(conn, "DORP VIEW data00data")
-  if(view = TRUE) {
+  DBI::dbExecute(conn, "DROP VIEW data00data")
+  if(view) {
     return(View(out))
   } else {
     return(out)

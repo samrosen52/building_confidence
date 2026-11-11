@@ -1,7 +1,8 @@
 # generate_data
 
-
+library(dplyr)
 # Data from Dhana K, Beck T, Desai P, Wilson RS, Evans DA, Rajan KB. Prevalence of Alzheimer's disease dementia in the 50 US states and 3142 counties: A population estimate using the 2020 bridged-race postcensal from the National Center for Health Statistics. Alzheimers Dement. 2023 Oct;19(10):4388-4395. doi: 10.1002/alz.13081. Epub 2023 Jul 17. PMID: 37458371; PMCID: PMC10593099.
+n_per_state <- 1000
 
 state_data <- data.frame(
   state = c("CT", "ME", "MA", "NH", "RI", "VT"),
@@ -10,11 +11,15 @@ state_data <- data.frame(
   pop_total = c(3688496, 1414874, 7154084, 1415342, 1114521, 644663)
 )
 
-
+weights <- state_data |>
+  mutate(
+    weights = n_per_state/pop_total
+  ) |>
+  select(state, weights)
 
 # Creating simulated dataset ----------------------------------------------
 
-n_per_state <- 1000
+
 
 set.seed(4)
 
@@ -29,10 +34,13 @@ sim_df <- do.call(
       data.frame(
         id = (1:n_per_state) + (i-1)*n_per_state,
         state = st,
-        alzheim_BIN = rbinom(n = n_per_state, size = 1, prob = prev)
+        alzheim_BIN = rbinom(n = n_per_state, size = 1, prob = prev),
+        variable_cat = round(runif(n = n_per_state, min = 1, max = 5))
       )
     })
-)
+) |>
+  left_join(weights, by = "state")
+
 
 
 
