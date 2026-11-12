@@ -90,7 +90,7 @@ add_profile_ci <- function(d, level = 0.95) {
   d
 }
 
-
+# Is this the right way to get p-value for these functions?
 14*log(0.05) + (130-0.05)*log1p(-0.05)
 lrt_p <- function(y, n, p0 = 0.05) {
   if (!is.finite(y) || !is.finite(n) || n <= 0) return(NA_real_)
