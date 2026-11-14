@@ -147,6 +147,7 @@ prop_ci <- function(yes, n) {
   
 }
 
+prop_ci(sim_df$alzheim_BIN, 1)
 
 
 add_pct_ci <- function(x, dir = "row", conf = 0.95) {
