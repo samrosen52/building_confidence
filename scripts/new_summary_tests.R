@@ -130,7 +130,7 @@ profile_ci <- function(x, n, conf = 0.95) {
   hi <- if (phat >= 1) 1 else uniroot(f, c(phat, 1 - 1e-12))$root
   c(lo, hi)
 }
-qchisq(0.95, 1)/2
+
 
 
 profile_ci(test$alzheim_SUM[1], test$n_total[1])
