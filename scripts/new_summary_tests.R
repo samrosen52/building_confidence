@@ -1,4 +1,4 @@
-
+library(dplyr)
 library(duckdb)
 library(DBI)
 con <- dbConnect(duckdb())
