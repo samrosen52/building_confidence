@@ -18,7 +18,7 @@ test <- dbGetQuery(
   GROUP BY state, variable_cat
   ORDER BY state, variable_cat"
 )
-test
+
 
 binom.confint(test$alzheim_SUM[1], test$n_total[1]-test$alzheim_SUM[1], methods = "profile")
 binom.confint(test$alzheim_SUM, test$n_total-test$alzheim_SUM, methods = "profile")
