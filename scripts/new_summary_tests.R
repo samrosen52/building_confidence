@@ -24,7 +24,6 @@ binom.confint(test$alzheim_SUM[1], test$n_total[1]-test$alzheim_SUM[1], methods 
 binom.confint(test$alzheim_SUM, test$n_total-test$alzheim_SUM, methods = "profile")
 binom.confint(test$alzheim_SUM_weighted, test$n_weighted-test$alzheim_SUM_weighted, methods = "profile")
 
-?binom.confint
 
 
 
