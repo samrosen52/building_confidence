@@ -3,6 +3,7 @@ library(duckdb)
 library(DBI)
 con <- dbConnect(duckdb())
 
+
 library(binom)
 get_variable_names(con, 'data/sim_data.parquet')
 test <- dbGetQuery(
