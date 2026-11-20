@@ -1,10 +1,11 @@
 library(dplyr)
 library(duckdb)
 library(DBI)
+library(binom)
 con <- dbConnect(duckdb())
 
 
-library(binom)
+
 get_variable_names(con, 'data/sim_data.parquet')
 test <- dbGetQuery(
   con,
