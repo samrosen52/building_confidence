@@ -6,6 +6,8 @@ con <- dbConnect(duckdb())
 
 
 
+
+
 get_variable_names(con, 'data/sim_data.parquet')
 test <- dbGetQuery(
   con,
