@@ -26,8 +26,6 @@ binom.confint(test$alzheim_SUM, test$n_total-test$alzheim_SUM, methods = "profil
 binom.confint(test$alzheim_SUM_weighted, test$n_weighted-test$alzheim_SUM_weighted, methods = "profile")
 
 
-
-
 get_weighted_sums <- function(con, path, group_vars, outcome, weight = NULL) {
   q   <- function(x) as.character(dbQuoteIdentifier(con, x))
   grp <- paste(q(group_vars), collapse = ", ")
@@ -37,7 +35,7 @@ get_weighted_sums <- function(con, path, group_vars, outcome, weight = NULL) {
     where_weight <- ""
   } else {
     w          <- q(weight)
-    where_weight <- glue("AND {w} IS NOT NULL")
+    where_weight <- glue::glue("AND {w} IS NOT NULL")
   }
   src <- as.character(dbQuoteString(con, path))
   
@@ -57,6 +55,151 @@ get_weighted_sums <- function(con, path, group_vars, outcome, weight = NULL) {
   as_tibble(dbGetQuery(con, sql))
 }
 
+
+get_weighted_sums <- function(con, path, exposure, outcome, group_vars, weight = NULL) {
+  
+  q   <- function(x) as.character(dbQuoteIdentifier(con, x))
+  grp <- paste(q(group_vars), collapse = ", ")
+  y   <- q(outcome)
+  if (is.null(weight)) {
+    w          <- "1"
+    where_weight <- ""
+  } else {
+    w          <- q(weight)
+    where_weight <- glue::glue("AND {w} IS NOT NULL")
+  }
+  src <- as.character(dbQuoteString(con, path))
+  
+  sql <- glue::glue("
+    SELECT {grp},
+      COUNT(*)::DOUBLE              AS n,
+      SUM({y})::DOUBLE              AS sum_y,
+      SUM({w})::DOUBLE              AS sum_w,
+      SUM({y} * {w})::DOUBLE        AS sum_wy,
+      SUM({w} * {w})::DOUBLE        AS sum_w2,
+      SUM({y} * {w} * {w})::DOUBLE  AS sum_w2y
+    FROM read_parquet({src})
+    WHERE {y} IS NOT NULL {where_weight}
+    GROUP BY {grp}
+  ")
+  
+  as_tibble(dbGetQuery(con, sql))
+}
+
+
+dbGetQuery(
+  con,
+  "WITH t2 AS
+          (SELECT 'variable_cat' AS var, variable_cat AS level, 'state' AS by_var, state AS by_level, COUNT(*) AS value1
+          FROM 'data/sim_data.parquet'
+          GROUP BY var, level, by_var, by_level)
+        SELECT var, level, by_var, by_level, value1,
+          (value1)/(SUM(value1) OVER (PARTITION by var, level))*100.0 AS value2,
+          'categorical' AS type
+        FROM t2
+        ORDER BY var, level, by_level"
+)
+
+dbGetQuery(
+  con,
+  "WITH t2 AS
+          (SELECT unnest('variable_cat', 'alzheim_BIN') AS var, unnest(variable_cat, alzheim_BIN) AS level, 'state' AS by_var, state AS by_level, COUNT(*) AS value1
+          FROM 'data/sim_data.parquet'
+          GROUP BY var, level, by_var, by_level)
+        SELECT var, level, by_var, by_level, value1,
+          (value1)/(SUM(value1) OVER (PARTITION by var, level))*100.0 AS value2,
+          'categorical' AS type
+        FROM t2
+        ORDER BY var, level, by_level"
+)
+
+
+dbGetQuery(
+  con,
+  "SELECT variable_cat,
+    COUNT(*)::DOUBLE as n,
+    SUM()::DOUBLE AS sum_y
+  
+  "
+)
+
+
+numeric_res <- dbGetQuery(
+  con,
+  "WITH unpivoted AS (
+    UNPIVOT 'data/sim_data.parquet'
+    ON variable_cat
+    INTO
+      NAME var
+      VALUE level
+  )
+  
+  SELECT *
+  FROM unpivoted
+  
+  t2 AS (
+    SELECT
+      var,
+      level::VARCHAR AS level,
+      'alzheim_BIN' AS by_var,
+      alzheim_BIN::VARCHAR AS by_level,
+      AVG(var) AS value1,
+      STDDEV(var) AS value2
+      FROM unpivoted
+      GROUP BY var, level, by_var, by_level
+  )
+  
+  SELECT
+    var,
+    level,
+    by_level, 
+    value1, 
+    value2
+  FROM t2
+  ORDER BY var, level, by_var, by_level
+  
+  
+  "
+  )
+
+
+
+
+categorical_res <- dbGetQuery(con, "
+WITH unpivoted AS (
+  UNPIVOT 'data/sim_data.parquet'
+  ON variable_cat::VARCHAR, state::VARCHAR
+  INTO
+    NAME var
+    VALUE level
+),
+t2 AS (
+  SELECT 
+    var, 
+    level::VARCHAR AS level, 
+    'alzheim_BIN' AS by_var, 
+    alzheim_BIN::VARCHAR AS by_level, 
+    COUNT(*) AS value1
+  FROM unpivoted
+  GROUP BY var, level, by_var, by_level
+)
+SELECT 
+  var, 
+  level, 
+  by_var, 
+  by_level, 
+  value1, 
+  (value1 * 100.0) / SUM(value1) OVER (PARTITION BY var, level) AS value2, 
+  'categorical' AS type
+FROM t2
+ORDER BY var, level, by_level;
+")
+categorical_res
+
+get_weighted_sums(con, 'data/sim_data.parquet', c("state", "variable_cat"), "alzheim_BIN", weight = "weights")
+
+get_weighted_sums(con, 'data/sim_data.parquet', "state", "alzheim_BIN", weight = "weights")
+
 add_weighted_stats <- function(d) {
   d |>
     mutate(
@@ -68,6 +211,25 @@ add_weighted_stats <- function(d) {
       y_eff = p_w * n_eff              # effective count for binomial CIs
     )
 }
+
+res <- get_weighted_sums(con, 'data/sim_data.parquet', "variable_cat", "alzheim_BIN") |>
+  add_weighted_stats()
+
+
+
+
+
+
+?uniroot
+
+library(purrr)
+map2(
+  res$sum_y, res$sum_w,
+  ~profile_ci(.x, .y)
+)
+
+profile_ci(147, 1513)
+
 
 profile_ci <- function(y, n, level = 0.95) {
   if (!is.finite(y) || !is.finite(n) || n <= 0) return(c(NA_real_, NA_real_))
@@ -82,6 +244,19 @@ profile_ci <- function(y, n, level = 0.95) {
   hi <- if (p_hat >= 1) 1 else uniroot(f, c(p_hat, 1 - eps), tol = 1e-10)$root
   c(lo, hi)
 }
+
+
+glm(cbind(111, 889)~1, family = binomial()) |> confint() |> plogis()
+profile_ci(111, 1000)
+
+
+
+
+
+
+
+
+
 
 add_profile_ci <- function(d, level = 0.95) {
   ci <- mapply(profile_ci, d$y_eff, d$n_eff, level = level)
