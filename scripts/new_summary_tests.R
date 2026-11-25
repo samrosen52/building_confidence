@@ -56,6 +56,7 @@ get_weighted_sums <- function(con, path, group_vars, outcome, weight = NULL) {
 }
 
 
+
 get_weighted_sums <- function(con, path, exposure, outcome, group_vars, weight = NULL) {
   
   q   <- function(x) as.character(dbQuoteIdentifier(con, x))
@@ -77,7 +78,8 @@ get_weighted_sums <- function(con, path, exposure, outcome, group_vars, weight =
       SUM({w})::DOUBLE              AS sum_w,
       SUM({y} * {w})::DOUBLE        AS sum_wy,
       SUM({w} * {w})::DOUBLE        AS sum_w2,
-      SUM({y} * {w} * {w})::DOUBLE  AS sum_w2y
+      SUM({y} * {w} * {w})::DOUBLE  AS sum_w2y,
+      SUM({y} * {y} * {w} * {w})::DOUBLE AS sum_w2y2
     FROM read_parquet({src})
     WHERE {y} IS NOT NULL {where_weight}
     GROUP BY {grp}
@@ -86,6 +88,51 @@ get_weighted_sums <- function(con, path, exposure, outcome, group_vars, weight =
   as_tibble(dbGetQuery(con, sql))
 }
 
+
+get_weighted_sums <- function(con, path, group_vars, outcome, weight = NULL) {
+  q   <- function(x) as.character(dbQuoteIdentifier(con, x))
+  grp <- paste(q(group_vars), collapse = ", ")
+  y   <- q(outcome)
+  if (is.null(weight)) {
+    w          <- "1"
+    where_weight <- ""
+  } else {
+    w          <- q(weight)
+    where_weight <- glue::glue("AND {w} IS NOT NULL")
+  }
+  src <- as.character(dbQuoteString(con, path))
+  
+  sql <- glue::glue("
+    SELECT {grp},
+      COUNT(*)::DOUBLE              AS n,
+      SUM({y})::DOUBLE              AS sum_y,
+      SUM({w})::DOUBLE              AS sum_w,
+      SUM({y} * {w})::DOUBLE        AS sum_wy,
+      SUM({w} * {w})::DOUBLE        AS sum_w2,
+      SUM({y} * {w} * {w})::DOUBLE  AS sum_w2y,
+      SUM({y} * {y} * {w} * {w})::DOUBLE AS sum_w2y2
+    FROM read_parquet({src})
+    WHERE {y} IS NOT NULL {where_weight}
+    GROUP BY {grp}
+  ")
+  
+  as_tibble(dbGetQuery(con, sql))
+}
+
+add_weighted_stats <- function(d) {
+  d |>
+    mutate(
+      p_w   = sum_wy / sum_w,                       # the weighted mean (a proportion if y is 0/1)
+      var_p = pmax((sum_w2y2 - 2 * p_w * sum_w2y + p_w^2 * sum_w2) / sum_w^2, 0),
+      se_p  = sqrt(var_p),
+      n_eff = sum_w^2 / sum_w2,
+      deff  = n * sum_w2 / sum_w^2,
+      y_eff = p_w * n_eff,
+      n_var = if_else(var_p > 0 & p_w > 0 & p_w < 1,
+                      p_w * (1 - p_w) / var_p,       # n that matches the design-based variance
+                      n_eff)
+    )
+}
 
 dbGetQuery(
   con,
@@ -214,11 +261,54 @@ add_weighted_stats <- function(d) {
 
 res <- get_weighted_sums(con, 'data/sim_data.parquet', "variable_cat", "alzheim_BIN") |>
   add_weighted_stats()
+res
+
+
+get_weighted_sums(con, 'data/sim_data.parquet', "alzheim_BIN", "variable_cat") |> add_weighted_stats()
+get_weighted_sums(con, 'data/sim_data.parquet', "variable_cat", "alzheim_BIN") |> add_weighted_stats()
+
+add_profile_ci <- function(d, type = c("prop", "mean"), level = 0.95,
+                           match_var = FALSE) {
+  type <- match.arg(type)
+  
+  if (type == "prop") {
+    stopifnot(all(d$p_w >= 0 & d$p_w <= 1, na.rm = TRUE))
+    n_use <- if (match_var) d$n_var else d$n_eff
+    y_use <- d$p_w * n_use
+    ci <- vapply(seq_len(nrow(d)),
+                 function(i) profile_ci(y_use[i], n_use[i], level),
+                 numeric(2))
+    d$ci_lo <- ci[1, ]
+    d$ci_hi <- ci[2, ]
+  } else {
+    cut  <- qchisq(level, 1) / 2
+    half <- sqrt(d$var_p * d$n_eff * (exp(2 * cut / d$n_eff) - 1))
+    d$ci_lo <- d$p_w - half
+    d$ci_hi <- d$p_w + half
+  }
+  d
+}
+
+res |> add_profile_ci()
+
+get_weighted_sums(con, 'data/sim_data.parquet', "variable_cat", "alzheim_BIN") |>
+  add_weighted_stats() |>
+  add_profile_ci("prop") |>
+  dplyr::select(variable_cat, sum_y, sum_w, p_w, ci_lo, ci_hi)
+
+get_weighted_sums(con, 'data/sim_data.parquet', "alzheim_BIN", "variable_cat") |>
+  add_weighted_stats() |>
+  add_profile_ci("mean") |>
+  dplyr::select(alzheim_BIN, sum_y, sum_w, p_w, ci_lo, ci_hi)
 
 
 
 
-
+loaded_data <- arrow::read_parquet('data/sim_data.parquet')
+mean({loaded_data |> dplyr::filter(alzheim_BIN == 1)}$variable_cat)
+mean({loaded_data |> dplyr::filter(alzheim_BIN == 0)}$variable_cat)
+1836/607
+16184/5393
 
 ?uniroot
 
