@@ -1,5 +1,5 @@
 # add_profile_ci_for_import
-
+# add way to calculate for mean
 
 get_table1_sums <- function(con, path, cat_vars = NULL, cont_vars = NULL,
                             by = NULL, weight = NULL, overall = TRUE,
