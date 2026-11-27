@@ -415,5 +415,5 @@ get_table1_sums(con, 'data/sim_data.parquet', cat_vars = "variable_cat", overall
 sd(loaded_data$variable_cat)
 
 
-
+# add another function to tie everything together
 
