@@ -416,4 +416,5 @@ sd(loaded_data$variable_cat)
 
 
 # add another function to tie everything together
+# add more variables to the sim dataset
 
